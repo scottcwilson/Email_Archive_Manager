@@ -21,6 +21,7 @@
   if (isset($_GET['print_format']) && ($_GET['print_format'] < 1)) {
      $isForDisplay = false; 
   }
+  $showErrors = $_GET['show_errors'] ?? 0;
   if ($action == 'prev_text' || $action == 'prev_html') {
     $isForDisplay = false;
   }
@@ -132,6 +133,12 @@ font-weight:bold;
 border-color:#FF0000;
 border-style:solid;
 border-width:3px;
+}
+.errorinfoText {
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 12em;
+  overflow: hidden;
 }
 </style>
 <?php if (PROJECT_VERSION_MAJOR . '.' . PROJECT_VERSION_MINOR > '1.5.6') { ?>
@@ -328,10 +335,10 @@ var EndDate = new ctlSpiffyCalendarBox("EndDate", "search", "end_date", "btnDate
             </table></td>
             <td><table border="0" cellspacing="0" cellpadding="2">
               <tr>
-                <td class="smallText"><?php echo zen_draw_checkbox_field('print_format', 1) . HEADING_PRINT_FORMAT; ?></td>
+                <td class="smallText"><?php echo zen_draw_checkbox_field('print_format', 1, $isForDisplay) . HEADING_PRINT_FORMAT; ?></td>
               </tr>
               <tr>
-                <td><?php echo zen_draw_separator('pixel_trans.gif', 1, 5); ?></td>
+              <td class="smallText"><?php echo zen_draw_checkbox_field('show_errors', 1, $showErrors) . HEADING_SHOW_ERRORS; ?></td>
               </tr>
               <tr>
                 <td class="main" valign="bottom"><input type="submit" value="<?php echo BUTTON_SEARCH; ?>"></td>
@@ -352,38 +359,56 @@ var EndDate = new ctlSpiffyCalendarBox("EndDate", "search", "end_date", "btnDate
             <td class="dataTableHeadingContent" align="left"><?php echo TABLE_HEADING_CUSTOMERS_NAME; ?></td>
             <td class="dataTableHeadingContent" align="left"><?php echo TABLE_HEADING_CUSTOMERS_EMAIL; ?></td>
             <td class="dataTableHeadingContent" align="left"><?php echo TABLE_HEADING_EMAIL_SUBJECT; ?></td>
+            <?php if ($showErrors) { ?>
+              <td class="dataTableHeadingContent" align="left"><?php echo TABLE_HEADING_EMAIL_ERRORINFO; ?></td>
+            <?php } ?>
             <td class="dataTableHeadingContent" align="right"><?php echo TABLE_HEADING_EMAIL_FORMAT; ?></td>
           </tr>
 <?php
   // build search query
+  $select_fields = [
+    'archive_id',
+    'email_to_name',
+    'email_to_address',
+    'email_from_name',
+    'email_from_address',
+    'email_subject',
+    'email_html',
+    'email_text',
+    'date_sent',
+    'module',
+  ];
+  $where_clauses = [];
 
-  $archive_search = "select * from " . TABLE_EMAIL_ARCHIVE . " ";
-  if ($search_sd || $search_ed || $search_text || $search_module) {
-    $archive_search .= " where ";
+  if ($showErrors) {
+    $select_fields[] = 'errorinfo';
+    $where_clauses[] = 'errorinfo IS NOT NULL';
   }
 
-  if ($search_sd) $archive_search .= "date_sent >= '" . $sd_raw . "' ";
+  $archive_search = 'SELECT ' . join(', ', $select_fields) . ' FROM ' . TABLE_EMAIL_ARCHIVE; // . " ";
+
+  if ($search_sd) $where_clauses[] = "date_sent >= '$sd_raw'";
 
   if ($search_ed) {
-    if ($search_sd) $archive_search .= "and ";
-    $archive_search .= "date_sent <= DATE_ADD('" . $ed_raw . "', INTERVAL 1 DAY) ";
+    $where_clauses[] = "date_sent <= DATE_ADD('$ed_raw', INTERVAL 1 DAY)";
   }
 
   if ($search_text) {
-    if ($search_sd || $search_ed) $archive_search .= "and ";
-
     $keywords = zen_db_input(zen_db_prepare_input($_GET['text']));
-    $archive_search .= "(email_to_address like '%" . $keywords . "%' or email_subject like '%" . $keywords . "%' or email_html like '%" . $keywords . "%' or email_text like '%" . $keywords . "%' or email_to_name like '%" . $keywords . "%') ";
+    $where_clauses[] = array_map(function ($field) use ($keywords) {
+      return "$field like '%$keywords%";
+    }, [ 'email_to_address', 'email_subject', 'email_html', 'email_text', 'email_to_name' ]);
   }
 
   if ($search_module) {
-    if ($search_sd || $search_ed || $search_text) {
-      $archive_search .= "and ";
-    }
-    $archive_search .= "module = '" . $_GET['module'] . "' ";
+    $where_clauses[] = "module = '{$_GET['module']}'";
   }
 
-  $archive_search .= "order by archive_id desc";
+  if (count($where_clauses) != 0) {
+    $archive_search .= ' WHERE (' . join(') AND (', $where_clauses) . ')';
+  }
+
+  $archive_search .= " ORDER BY archive_id DESC";
 
   $email_split = new splitPageResults($_GET['page'], MAX_DISPLAY_SEARCH_RESULTS_ORDERS, $archive_search, $email_query_numrows);
 
@@ -409,11 +434,14 @@ var EndDate = new ctlSpiffyCalendarBox("EndDate", "search", "end_date", "btnDate
             <td class="dataTableContent" align="left"><?php echo $email_archive->fields['email_to_address']; ?></td>
             <td class="dataTableContent" align="left"><?php echo substr(zen_output_string_protected($email_archive->fields['email_subject']), 0, SUBJECT_SIZE_LIMIT);?>
             <?php if (strlen($email_archive->fields['email_subject']) > SUBJECT_SIZE_LIMIT) echo MESSAGE_LIMIT_BREAK; ?></td>
+            <?php if ($showErrors) { ?>
+            <td class="dataTableContent errorinfoText" align="left"><?php echo $email_archive->fields['errorinfo']; ?></td>
+            <?php } ?>
             <td class="dataTableContent" align="right"><?php
               if (isset($archive) && is_object($archive) && ($email_archive->fields['archive_id'] == $archive->archive_id) && $isForDisplay) {
                 echo zen_image(DIR_WS_IMAGES . 'icon_arrow_right.gif', '');
               }
-              else {
+              else {c
                 if ($email_archive->fields['email_html'] != '') {
                   echo TABLE_FORMAT_HTML;
                 }
@@ -470,6 +498,12 @@ var EndDate = new ctlSpiffyCalendarBox("EndDate", "search", "end_date", "btnDate
     $contents[] = array('text' => '<br><b>' . TEXT_EMAIL_EXCERPT . '</b>');
 
     $contents[] = array('text' => '<br>' . nl2br(substr(zen_output_string_protected($archive->email_text), 0, MESSAGE_SIZE_LIMIT)) . MESSAGE_LIMIT_BREAK);
+
+    if ($showErrors) {
+      $contents[] = array('text' => '<br><b>' . TEXT_EMAIL_ERRORINFO . '</b>');
+
+      $contents[] = array('text' => '<br>' . nl2br(substr(zen_output_string_protected($archive->errorinfo), 0, MESSAGE_SIZE_LIMIT)) . MESSAGE_LIMIT_BREAK);
+    }
   }
 
   // display sidebox
