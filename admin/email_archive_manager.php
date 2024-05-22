@@ -21,7 +21,6 @@
   if (isset($_GET['print_format']) && ($_GET['print_format'] < 1)) {
      $isForDisplay = false; 
   }
-  $showErrors = $_GET['show_errors'] ?? 0;
   if ($action == 'prev_text' || $action == 'prev_html') {
     $isForDisplay = false;
   }
@@ -69,7 +68,18 @@
   }
   $search_sd = ((isset($_GET['start_date']) && zen_not_null($_GET['start_date'])) ? true : false);
   $search_ed = ((isset($_GET['end_date']) && zen_not_null($_GET['end_date'])) ? true : false);
+  // Search text state
   $search_text = ((isset($_GET['text']) && zen_not_null($_GET['text'])) ? true : false);
+  $keywords = $search_text ? zen_db_input(zen_db_prepare_input($_GET['text'])) : '';
+  // Error text search state
+  $search_errors = ((isset($_GET['errorinfo']) && zen_not_null($_GET['errorinfo'])) ? true : false);
+  $error_keywords = $search_errors ? zen_db_input(zen_db_prepare_input($_GET['errorinfo'])) : '';
+  // Radio button state
+  $showErrors = $_GET['show_errors'] ?? 'off';
+  if ($showErrors === 'off' && $search_errors) {
+    $showErrors = 'all_inc'; // force option on
+  }
+
   $search_module = ((isset($_GET['module']) && zen_not_null($_GET['module']) && $_GET['module'] != 1) ? true : false);
   if ($search_sd) { 
      $sd_raw = zen_date_raw($_GET['start_date']);
@@ -319,10 +329,20 @@ var EndDate = new ctlSpiffyCalendarBox("EndDate", "search", "end_date", "btnDate
               <tr>
                 <td class="smallText" valign="top"><?php
                   echo HEADING_SEARCH_TEXT . '<br>';
-                  echo zen_draw_input_field('text');
-                  if (isset($_GET['text']) && zen_not_null($_GET['text'])) {
-                    $keywords = zen_db_input(zen_db_prepare_input($_GET['text']));
+                  echo zen_draw_input_field('text', $keywords);
+                  echo '<i class="fa-solid fa-circle-info text-primary" title="' . TOOLTIP_SEARCH_TEXT . '"></i>';
+                  if (!empty($keywords)) {
                     echo '<br>' . HEADING_SEARCH_TEXT_FILTER . $keywords;
+                  }
+                ?></td>
+              </tr>
+              <tr>
+                <td class="smallText" valign="top"><?php
+                  echo HEADING_SEARCH_ERROR . '<br>';
+                  echo zen_draw_input_field('errorinfo', $error_keywords);
+                  echo '<i class="fa-solid fa-circle-info text-primary" title="' . TOOLTIP_SEARCH_ERROR . '"></i>';
+                  if (!empty($error_keywords)) {
+                    echo '<br>' . HEADING_SEARCH_TEXT_FILTER . $error_keywords;
                   }
                 ?></td>
               </tr>
@@ -335,10 +355,24 @@ var EndDate = new ctlSpiffyCalendarBox("EndDate", "search", "end_date", "btnDate
             </table></td>
             <td><table border="0" cellspacing="0" cellpadding="2">
               <tr>
-                <td class="smallText"><?php echo zen_draw_checkbox_field('print_format', 1, $isForDisplay) . HEADING_PRINT_FORMAT; ?></td>
+                <td class="smallText"><?php echo zen_draw_checkbox_field('print_format', 1, $isForDisplay) . '&nbsp;' . HEADING_PRINT_FORMAT; ?></td>
               </tr>
               <tr>
-              <td class="smallText"><?php echo zen_draw_checkbox_field('show_errors', 1, $showErrors) . HEADING_SHOW_ERRORS; ?></td>
+              <td class="smallText">
+                <?php echo HEADING_SHOW_ERRORS . '&nbsp;' .
+                  '<i class="fa-solid fa-circle-info text-primary" title="' . TOOLTIP_SHOW_ERRORS . '"></i>&nbsp;'; ?>
+                <div class="btn-group" data-toggle="buttons">
+                  <label class="btn btn-xs btn-primary <?php echo $showErrors === 'off' ? 'active' : '' ?>">
+                    <input type="radio" name="show_errors" value="off" autocomplete="off" <?php echo $showErrors === 'off' ? 'checked' : '' ?>> <?php echo HEADING_SHOW_ERRORS_OFF ?>
+                  </label>
+                  <label class="btn btn-xs btn-primary <?php echo $showErrors === 'all_inc' ? 'active' : '' ?>">
+                    <input type="radio" name="show_errors" value="all_inc" autocomplete="off" <?php echo $showErrors === 'all_inc' ? 'checked' : '' ?>> <?php echo HEADING_SHOW_ERRORS_ALL_INC ?>
+                  </label>
+                  <label class="btn btn-xs btn-primary <?php echo $showErrors === 'only' ? 'active' : '' ?>">
+                    <input type="radio" name="show_errors" value="only" autocomplete="off" <?php echo $showErrors === 'only' ? 'checked' : '' ?>> <?php echo HEADING_SHOW_ERRORS_ONLY ?>
+                  </label>
+                </div>
+              </td>
               </tr>
               <tr>
                 <td class="main" valign="bottom"><input type="submit" value="<?php echo BUTTON_SEARCH; ?>"></td>
@@ -359,7 +393,7 @@ var EndDate = new ctlSpiffyCalendarBox("EndDate", "search", "end_date", "btnDate
             <td class="dataTableHeadingContent" align="left"><?php echo TABLE_HEADING_CUSTOMERS_NAME; ?></td>
             <td class="dataTableHeadingContent" align="left"><?php echo TABLE_HEADING_CUSTOMERS_EMAIL; ?></td>
             <td class="dataTableHeadingContent" align="left"><?php echo TABLE_HEADING_EMAIL_SUBJECT; ?></td>
-            <?php if ($showErrors) { ?>
+            <?php if ($showErrors !== 'off') { ?>
               <td class="dataTableHeadingContent" align="left"><?php echo TABLE_HEADING_EMAIL_ERRORINFO; ?></td>
             <?php } ?>
             <td class="dataTableHeadingContent" align="right"><?php echo TABLE_HEADING_EMAIL_FORMAT; ?></td>
@@ -378,14 +412,21 @@ var EndDate = new ctlSpiffyCalendarBox("EndDate", "search", "end_date", "btnDate
     'date_sent',
     'module',
   ];
+
   $where_clauses = [];
 
-  if ($showErrors) {
-    $select_fields[] = 'errorinfo';
-    $where_clauses[] = 'errorinfo IS NOT NULL';
+  if ($search_errors) {
+    $where_clauses[] = "errorinfo LIKE '%$error_keywords%'";
   }
 
-  $archive_search = 'SELECT ' . join(', ', $select_fields) . ' FROM ' . TABLE_EMAIL_ARCHIVE; // . " ";
+  if ($showErrors !== 'off') {
+    // We are displaying errorinfo column.
+    $select_fields[] = 'errorinfo';
+    if ($showErrors === 'only') {
+      // We only want rows that had some errorinfo
+      $where_clauses[] = 'errorinfo IS NOT NULL';
+    }
+  }
 
   if ($search_sd) $where_clauses[] = "date_sent >= '$sd_raw'";
 
@@ -394,15 +435,17 @@ var EndDate = new ctlSpiffyCalendarBox("EndDate", "search", "end_date", "btnDate
   }
 
   if ($search_text) {
-    $keywords = zen_db_input(zen_db_prepare_input($_GET['text']));
-    $where_clauses[] = array_map(function ($field) use ($keywords) {
-      return "$field like '%$keywords%";
-    }, [ 'email_to_address', 'email_subject', 'email_html', 'email_text', 'email_to_name' ]);
+    $where_clauses[] = join(' or ', array_map(function ($field) use ($keywords) {
+      return "$field like '%$keywords%'";
+    }, [ 'email_to_address', 'email_subject', 'email_html', 'email_text', 'email_to_name' ]));
   }
 
   if ($search_module) {
     $where_clauses[] = "module = '{$_GET['module']}'";
   }
+
+  // Build the SQL
+  $archive_search = 'SELECT ' . join(', ', $select_fields) . ' FROM ' . TABLE_EMAIL_ARCHIVE; // . " ";
 
   if (count($where_clauses) != 0) {
     $archive_search .= ' WHERE (' . join(') AND (', $where_clauses) . ')';
@@ -434,14 +477,14 @@ var EndDate = new ctlSpiffyCalendarBox("EndDate", "search", "end_date", "btnDate
             <td class="dataTableContent" align="left"><?php echo $email_archive->fields['email_to_address']; ?></td>
             <td class="dataTableContent" align="left"><?php echo substr(zen_output_string_protected($email_archive->fields['email_subject']), 0, SUBJECT_SIZE_LIMIT);?>
             <?php if (strlen($email_archive->fields['email_subject']) > SUBJECT_SIZE_LIMIT) echo MESSAGE_LIMIT_BREAK; ?></td>
-            <?php if ($showErrors) { ?>
+            <?php if ($showErrors == 'all_inc' || $showErrors == 'only') { ?>
             <td class="dataTableContent errorinfoText" align="left"><?php echo $email_archive->fields['errorinfo']; ?></td>
             <?php } ?>
             <td class="dataTableContent" align="right"><?php
               if (isset($archive) && is_object($archive) && ($email_archive->fields['archive_id'] == $archive->archive_id) && $isForDisplay) {
                 echo zen_image(DIR_WS_IMAGES . 'icon_arrow_right.gif', '');
               }
-              else {c
+              else {
                 if ($email_archive->fields['email_html'] != '') {
                   echo TABLE_FORMAT_HTML;
                 }
@@ -499,7 +542,7 @@ var EndDate = new ctlSpiffyCalendarBox("EndDate", "search", "end_date", "btnDate
 
     $contents[] = array('text' => '<br>' . nl2br(substr(zen_output_string_protected($archive->email_text), 0, MESSAGE_SIZE_LIMIT)) . MESSAGE_LIMIT_BREAK);
 
-    if ($showErrors) {
+    if ($showErrors !== 'off') {
       $contents[] = array('text' => '<br><b>' . TEXT_EMAIL_ERRORINFO . '</b>');
 
       $contents[] = array('text' => '<br>' . nl2br(substr(zen_output_string_protected($archive->errorinfo), 0, MESSAGE_SIZE_LIMIT)) . MESSAGE_LIMIT_BREAK);
