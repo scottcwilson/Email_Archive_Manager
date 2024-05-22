@@ -14,16 +14,26 @@ define('HEADING_TEXT_INSTEAD', 'Showing TEXT for safety; HTML may be malicious.'
 define('HEADING_MODULE_SELECT', 'Filter by module');
 define('HEADING_SEARCH_TEXT', 'Search for text');
 define('HEADING_SEARCH_TEXT_FILTER', 'Current search filter: ');
+define('HEADING_SEARCH_ERROR', 'Search for error');
 define('HEADING_START_DATE', 'Start Date');
 define('HEADING_END_DATE', 'End Date');
 define('HEADING_PRINT_FORMAT', 'Display results in print format');
+define('HEADING_SHOW_ERRORS', 'Display Errors (if any)');
+define('HEADING_SHOW_ERRORS_OFF', 'Off');
+define('HEADING_SHOW_ERRORS_ALL_INC', 'All Incl Error');
+define('HEADING_SHOW_ERRORS_ONLY', 'Only With Error');
 define('HEADING_TRIM_INSTRUCT', 'Delete e-mail older than...');
+
+define('TOOLTIP_SEARCH_TEXT', 'Searches in: Recipient Name and Address, email Subject, email HTML and TEXT content.');
+define('TOOLTIP_SHOW_ERRORS', 'Adds an \'Error Info\' column to the table below and filters results accordingly.');
+define('TOOLTIP_SEARCH_ERROR', 'Searches in Error Info and turns on \'Display Errors\'.');
 
 define('TABLE_HEADING_EMAIL_DATE', 'Date Sent');
 define('TABLE_HEADING_CUSTOMERS_NAME', 'Customer\'s Name');
 define('TABLE_HEADING_CUSTOMERS_EMAIL', 'Email Address');
 define('TABLE_HEADING_EMAIL_FORMAT', 'Format');
 define('TABLE_HEADING_EMAIL_SUBJECT', 'Subject');
+define('TABLE_HEADING_EMAIL_ERRORINFO', 'Error Info');
 define('TABLE_FORMAT_TEXT', 'TEXT');
 define('TABLE_FORMAT_HTML', 'HTML');
 
@@ -37,6 +47,7 @@ define('TEXT_EMAIL_FROM', 'From: ');
 define('TEXT_EMAIL_DATE_SENT', 'Sent: ');
 define('TEXT_EMAIL_SUBJECT', 'Subject: ');
 define('TEXT_EMAIL_EXCERPT', 'Message Excerpt:');
+define('TEXT_EMAIL_ERRORINFO', 'Error Information:');
 define('TEXT_EMAIL_NUMBER', 'Email #');
 
 define('RADIO_1_MONTH', ' 1 month');
