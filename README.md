@@ -1,3 +1,7 @@
+**Please Notes:** This repo is now obsolete; the current repo for this plugin is 
+https://github.com/zencart/email-archive-manager
+
+
 # Email Archive Manager plugin for Zen Cart 
 
 Allows you to view emails sent by your shopping cart.  Requires the `Email Archiving Active?` flag in Admin > Configuration > Email to be set to `true`.
